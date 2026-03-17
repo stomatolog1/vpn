@@ -12,19 +12,19 @@ const main_menu = 'AgACAgIAAxkBAAIFRWm0bkq7QbBB1hu4eccowjFeNANKAAKyG2sbdDShSXyYs
 const pay_photo = 'AgACAgIAAxkBAAIFQGm0aS5JhWfPAqVHrmiFwJuKFDmPAAKWG2sbdDShSUufIe2c-0UqAQADAgADeQADOgQ'
 const profil_photo = 'AgACAgIAAxkBAAIFSWm0bmIE_lN96TaDqUhdw4BafzMkAAKzG2sbdDShSeLAeGlvYKqaAQADAgADeQADOgQ'
 const supp_photo = 'AgACAgIAAxkBAAIFS2m0bnCeAAFa3DG2gcILgqhju5qNqAACtBtrG3Q0oUm1KUOJznBt3QEAAwIAA3kAAzoE'
+const tarid_photo = 'AgACAgIAAxkBAAIGH2m5j94SreQlsfkmoJyDYo_lNTLtAAKaG2sbacLISQWyLdDPl3iLAQADAgADeQADOgQ'
 
+
+const PRICES = {
+  1: 10000,   // 100 ⭐
+  3: 27000,   // 270 ⭐
+  6: 51000,   // 510 ⭐
+  12: 90000   // 900 ⭐ (добавил)
+};
 
 const acceptedOferta = new Set();
 const userLocks = new Map();
 const clientCache = new Map();
-
-async function fastAnswer(ctx, text = null) {
-  try {
-    await ctx.answerCallbackQuery({
-      text: text || undefined
-    });
-  } catch {}
-}
 
 
 async function hasUserAccepted(ctx) {
@@ -209,22 +209,25 @@ class XUIManager {
 
   const expiry = Date.now() + months * 2629800000;
 
-  await api.post("panel/api/inbounds/addClient", {
-    id: inbound.id,
-    settings: JSON.stringify({
-      clients: [{
-        id: id,
-        email: email,
-        enable: true,
-        limitIp: 1,
-        totalGB: 0,
-        expiryTime: expiry,
-        flow: "xtls-rprx-vision",
-        tgId: "",
-        subId: ""
-      }]
-    })
-  });
+  await api.post(
+      "panel/api/inbounds/addClient",
+      {
+        id: this.inbound.id,
+        settings: JSON.stringify({ 
+          clients: [{ 
+            id: id, 
+            email: email, 
+            enable: true, 
+            limitIp: 1, 
+            totalGB: 0, 
+            expiryTime: expiry, 
+            flow: "xtls-rprx-vision", 
+            tgId: "", 
+            subId: "",
+          }] 
+        })
+      }
+    );
 
   return id;
 }
@@ -346,41 +349,39 @@ async function safeEdit(ctx, text, keyboard = null, media = null) {
 ////////////////////////////////////////////////////////////
 
 function ofertaKeyboard() {
-
   return new InlineKeyboard()
     .url("📄 Оферта", "https://example.com/oferta")
     .row()
     .text("✅ Принять оферту", "accept_oferta");
-
 }
 
 function menuKeyboard() {
-
   return new InlineKeyboard()
-    .text("🔐 Купить VPN", "vpn").row()
-    .text("📲 Мой VPN", "myvpn").row()
-    .text("💬 Поддержка", "support");
-
+    .text("🌐 подключится", "vpn").row()
+    .text("⚙️ Управление VPN", "myvpn").row()
+    .text("💬 Поддержка", "support")
 }
 
 function vpnKeyboard() {
   return new InlineKeyboard()
     .text("1 месяц", "buy_1")
     .text("3 месяца", "buy_3").row()
-    .text("6 месяца", "buy_6").row()
-    .text("🔙 Назад", "menu");
+    .text("6 месяцев", "buy_6")
+    .text("12 месяцев", "buy_12").row()
+    .text("↩️ Назад", "menu");
 }
 
 function myVPNKeyboard() {
   return new InlineKeyboard()
-    .text("📲 Показать ключ", "my_key").row()
+    .text("🗝️ Показать ключ", "my_key").row()
     .text("🔄 Продлить VPN", "vpn").row()
-    .text("🔙 Назад", "menu");
+    .text("↩️ Назад", "menu");
 }
+
 function myVPNKeyboards(){
   return new InlineKeyboard()
     .text("🔄 Продлить VPN", "vpn").row()
-    .text("🔙 Назад", "menu");
+    .text("↩️ Назад", "menu");
 }
 ////////////////////////////////////////////////////////////
 // START
@@ -419,7 +420,7 @@ bot.callbackQuery("accept_oferta", async (ctx) => {
 
   acceptedOferta.add(ctx.from.id);
 
-  fastAnswer(ctx);
+  await ctx.answerCallbackQuery();
 
   await safeEdit(ctx,'',menuKeyboard(),main_menu);
 });
@@ -430,7 +431,7 @@ bot.callbackQuery("accept_oferta", async (ctx) => {
 
 bot.callbackQuery("menu", async (ctx) => {
 
-  fastAnswer(ctx);
+  await ctx.answerCallbackQuery();
   await safeEdit(ctx, "", menuKeyboard());
 
 });
@@ -442,7 +443,7 @@ bot.callbackQuery("menu", async (ctx) => {
 bot.callbackQuery("vpn", async (ctx) => {
   if (!(await hasUserAccepted(ctx)))
     return ctx.answerCallbackQuery("Сначала примите оферту");
-  fastAnswer(ctx);
+  await ctx.answerCallbackQuery();
   await safeEdit(ctx,`
 1️⃣ 1 месяц — 100 ₽
 
@@ -458,59 +459,29 @@ vpnKeyboard(),pay_photo);
 
 bot.callbackQuery(/buy_(\d+)/, async (ctx) => {
 
-  if (!(await hasUserAccepted(ctx))) return ctx.answerCallbackQuery("Сначала примите оферту");
+  if (!(await hasUserAccepted(ctx)))
+    return ctx.answerCallbackQuery("Сначала примите оферту");
 
-  if (lockUser(ctx.from.id)) return ctx.answerCallbackQuery("Подождите...");
+  const months = Number(ctx.match[1]);
 
-  fastAnswer(ctx);
-  try {
+  if (!PRICES[months])
+    return ctx.answerCallbackQuery("Ошибка тарифа");
 
-    const months = Number(ctx.match[1]);
-    const email = String(ctx.from.id);
-    const client = await xui.findClient(email);
+  await ctx.answerCallbackQuery();
 
-    if (!client) {
-  
-      console.log("ne players")
-      const uuid = await xui.addUser(email, months);
-      const link = xui.generateLink(uuid);
-
-      await ctx.reply(
-      `<pre>${link}</pre>
-      Нажмите чтобы скопировать`,
+  await ctx.api.sendInvoice(ctx.from.id, {
+    title: "VPN подписка",
+    description: `VPN на ${months} мес.`,
+    payload: `vpn_${months}_${ctx.from.id}`,
+    provider_token: "",
+    currency: "XTR",
+    prices: [
       {
-        parse_mode: "HTML"
+        label: `${months} мес.`,
+        amount: PRICES[months]
       }
-      );
-
-      await ctx.replyWithPhoto(
-        main_menu,
-        {
-          reply_markup: menuKeyboard()
-        }
-      );
-      return;
-    }
-    await xui.extendUser(client.uuid, email, months);
-      clientCache.delete(email);
-      const updatedClient = await xui.findClient(email);
-      const days = daysLeft(updatedClient.expiryTime);
-      await safeEdit(
-        ctx,
-        `✅ VPN продлён
-      ⏳ Осталось дней: ${days}`,
-        myVPNKeyboard(),
-        profil_photo
-      );
-  }
-
-  catch (err) {
-
-    console.error(err);
-
-    await ctx.reply("Ошибка сервера");
-
-  }
+    ]
+  });
 
 });
 
@@ -520,7 +491,7 @@ bot.callbackQuery(/buy_(\d+)/, async (ctx) => {
 
 bot.callbackQuery("myvpn", async (ctx) => {
 
-  fastAnswer(ctx);
+  await ctx.answerCallbackQuery();
 
   const email = String(ctx.from.id);
 
@@ -550,9 +521,69 @@ bot.callbackQuery("myvpn", async (ctx) => {
 // SHOW KEY
 ////////////////////////////////////////////////////////////
 
+bot.on("pre_checkout_query", (ctx) => {
+  return ctx.answerPreCheckoutQuery(true);
+});
+
+bot.on("message:successful_payment", async (ctx) => {
+
+  try {
+
+    const payload = ctx.message.successful_payment.invoice_payload;
+
+    const parts = payload.split("_");
+
+    const months = Number(parts[1]);
+    const userId = parts[2];
+
+    const email = String(userId);
+
+    const client = await xui.findClient(email);
+
+    if (!client) {
+
+      const uuid = await xui.addUser(email, months);
+      const link = xui.generateLink(uuid);
+
+      await ctx.reply(
+`✅ Оплата прошла
+
+🔐 Ваш VPN:
+<pre>${link}</pre>`,
+        { parse_mode: "HTML" }
+      );
+
+      return;
+
+    }
+
+    await xui.extendUser(client.uuid, email, months);
+
+    clientCache.delete(email);
+
+    const updatedClient = await xui.findClient(email);
+
+    const days = daysLeft(updatedClient.expiryTime);
+
+    await ctx.reply(
+`✅ VPN продлён!
+
+⏳ Осталось дней: ${days}`,
+      { parse_mode: "HTML" }
+    );
+
+  } catch (err) {
+
+    console.error("PAYMENT ERROR:", err);
+    await ctx.reply("Ошибка после оплаты");
+
+  }
+
+});
+
 bot.callbackQuery("my_key", async (ctx) => {
 
-  fastAnswer(ctx);
+  await ctx.answerCallbackQuery();
 
   const email = String(ctx.from.id);
 
@@ -580,7 +611,7 @@ bot.callbackQuery("my_key", async (ctx) => {
 
 bot.callbackQuery("support", async (ctx) => {
 
-  fastAnswer(ctx);
+  await ctx.answerCallbackQuery();
 
   await safeEdit(
   ctx,
