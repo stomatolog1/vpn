@@ -469,19 +469,18 @@ bot.callbackQuery(/buy_(\d+)/, async (ctx) => {
 
   await ctx.answerCallbackQuery();
 
-  await ctx.api.sendInvoice(ctx.from.id, {
-    title: "VPN подписка",
-    description: `VPN на ${months} мес.`,
-    payload: `vpn_${months}_${ctx.from.id}`,
-    provider_token: "",
-    currency: "XTR",
-    prices: [
-      {
-        label: `${months} мес.`,
-        amount: PRICES[months]
-      }
-    ]
-  });
+  await ctx.replyWithInvoice(
+  "VPN подписка",                      // title
+  `VPN на ${months} мес.`,             // description
+  `vpn_${months}_${ctx.from.id}`,      // payload
+  "XTR",                               // Stars
+  [
+    {
+      label: `${months} мес.`,
+      amount: PRICES[months]
+    }
+  ]
+);
 
 });
 
