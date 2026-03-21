@@ -439,7 +439,7 @@ bot.callbackQuery("accept_oferta", async (ctx) => {
 bot.callbackQuery("menu", async (ctx) => {
 
   await ctx.answerCallbackQuery();
-  await safeEdit(ctx, "", menuKeyboard());
+  await safeEdit(ctx, "", menuKeyboard(),main_menu);
 
 });
 
@@ -453,13 +453,14 @@ bot.callbackQuery("vpn", async (ctx) => {
   await ctx.answerCallbackQuery();
   await safeEdit(ctx,`
     Тарифы:
-1️⃣ 1 месяц — 100 ₽ / 90 ⭐
 
-3️⃣ 3 месяца — 270 ₽ / 200 ⭐
+1️⃣  1 месяц — 100 ₽  /  90 ⭐
 
-6️⃣ 6 месяцев — 510 ₽ / 450 ⭐
+3️⃣  3 месяца — 270 ₽  /  200 ⭐
 
-1️⃣2️⃣ 12 месяцев — 900 ₽ / 700 ⭐`,
+6️⃣  6 месяцев — 510 ₽  /  450 ⭐
+
+1️⃣2️⃣  12 месяцев — 900 ₽  /  700 ⭐`,
 vpnKeyboard(),tarid_photo);
 });
 
