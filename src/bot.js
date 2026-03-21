@@ -1,10 +1,17 @@
 require("dotenv").config();
 
-const { Bot, InlineKeyboard} = require("grammy");
-const { xui, daysLeft, clientCache } = require("./xui");
-////////////////////////////////////////////////////////////
+const { Bot, InlineKeyboard } = require("grammy");
+
+const {
+  PRICES,
+  acceptedOferta,
+  clientCache,
+  lockUser,
+  daysLeft,
+  xui
+} = require("./xui");
+
 // MEMORY
-////////////////////////////////////////////////////////////
 const main_photo = 'AgACAgIAAxkBAAIFQWm0bNDa_RYMy6dmVAUUcc7xsclyAAKsG2sbdDShSXgeYHN41_B0AQADAgADeQADOgQ'
 const main_menu = 'AgACAgIAAxkBAAIFRWm0bkq7QbBB1hu4eccowjFeNANKAAKyG2sbdDShSXyYsJWs5693AQADAgADeQADOgQ'
 const pay_photo = 'AgACAgIAAxkBAAIFQGm0aS5JhWfPAqVHrmiFwJuKFDmPAAKWG2sbdDShSUufIe2c-0UqAQADAgADeQADOgQ'
@@ -12,21 +19,7 @@ const profil_photo = 'AgACAgIAAxkBAAIFSWm0bmIE_lN96TaDqUhdw4BafzMkAAKzG2sbdDShSe
 const supp_photo = 'AgACAgIAAxkBAAIFS2m0bnCeAAFa3DG2gcILgqhju5qNqAACtBtrG3Q0oUm1KUOJznBt3QEAAwIAA3kAAzoE'
 const tarid_photo = 'AgACAgIAAxkBAAIGH2m5j94SreQlsfkmoJyDYo_lNTLtAAKaG2sbacLISQWyLdDPl3iLAQADAgADeQADOgQ'
 
-
-const PRICES = {
-  1: 90, 
-  3: 200, 
-  6: 450,   
-  12: 700   
-};
-
-const acceptedOferta = new Set();
-const userLocks = new Map();
-const clientCache = new Map();
-
-
 async function hasUserAccepted(ctx) {
-
   const id = ctx.from.id;
 
   if (acceptedOferta.has(id))
@@ -35,52 +28,26 @@ async function hasUserAccepted(ctx) {
   const email = String(id);
 
   try {
-
     const client = await xui.findClient(email);
 
     if (client) {
-
       acceptedOferta.add(id);
-
       return true;
-
     }
 
   } catch {}
 
   return false;
-
 }
 
-function lockUser(userId, ms = 1500) {
-
-  const now = Date.now();
-
-  if (userLocks.has(userId)) {
-
-    const last = userLocks.get(userId);
-
-    if (now - last < ms)
-      return true;
-
-  }
-  userLocks.set(userId, now);
-
-  return false;
-
-}
-////////////////////////////////////////////////////////////
 // BOT
-////////////////////////////////////////////////////////////
 const bot = new Bot(process.env.BOT_TOKEN);
-////////////////////////////////////////////////////////////
+
 // SAFE EDIT
-////////////////////////////////////////////////////////////
 async function safeEdit(ctx, text, keyboard = null, media = null) {
   if (!ctx.callbackQuery?.message)
-  return;
+    return;
   try {
-
     const msg = ctx.callbackQuery?.message;
     if (!msg) return;
 
@@ -95,7 +62,6 @@ async function safeEdit(ctx, text, keyboard = null, media = null) {
 
     // если нужно поменять медиа
     if (media) {
-
       const mediaId = typeof media === "string" ? media : String(media);
 
       const type = msg.video ? "video" : "photo";
@@ -111,26 +77,20 @@ async function safeEdit(ctx, text, keyboard = null, media = null) {
           reply_markup: keyboard || undefined
         }
       );
-
     }
 
     // если сообщение с фото или видео
     if (msg.photo || msg.video) {
-
       return await ctx.editMessageCaption({
         caption: text,
         ...options
       });
-
     }
 
     // если текст
     return await ctx.editMessageText(text, options);
 
-  }
-
-  catch (err) {
-
+  } catch (err) {
     const desc = err.description || "";
 
     if (
@@ -143,15 +103,10 @@ async function safeEdit(ctx, text, keyboard = null, media = null) {
       return;
 
     console.error("SAFE EDIT ERROR:", err);
-
   }
-
 }
 
-////////////////////////////////////////////////////////////
 // KEYBOARDS
-////////////////////////////////////////////////////////////
-
 function ofertaKeyboard() {
   return new InlineKeyboard()
     .url("📄 Оферта", "https://example.com/oferta")
@@ -194,41 +149,28 @@ function payKeyboard(months) {
     .text("💳 Оплатить ЮKassa", `pay_ykassa_${months}`).row()
     .text("↩️ Назад", "vpn");
 }
-////////////////////////////////////////////////////////////
+
 // START
-////////////////////////////////////////////////////////////
-
-
 bot.command("start", async (ctx) => {
-
   if (!(await hasUserAccepted(ctx))) {
-
     return ctx.replyWithPhoto(main_photo,
       {
-      caption: "Перед использованием VPN необходимо принять оферту",
-      reply_markup: ofertaKeyboard()
+        caption: "Перед использованием VPN необходимо принять оферту",
+        reply_markup: ofertaKeyboard()
       }
     );
-
   }
 
-await ctx.replyWithPhoto(
+  await ctx.replyWithPhoto(
     main_menu,
     {
       reply_markup: menuKeyboard()
     }
   );
-
 });
 
-
-
-////////////////////////////////////////////////////////////
 // ACCEPT OFERTA
-////////////////////////////////////////////////////////////
-
 bot.callbackQuery("accept_oferta", async (ctx) => {
-
   acceptedOferta.add(ctx.from.id);
 
   await ctx.answerCallbackQuery();
@@ -236,21 +178,13 @@ bot.callbackQuery("accept_oferta", async (ctx) => {
   await safeEdit(ctx,'',menuKeyboard(),main_menu);
 });
 
-////////////////////////////////////////////////////////////
 // MENU
-////////////////////////////////////////////////////////////
-
 bot.callbackQuery("menu", async (ctx) => {
-
   await ctx.answerCallbackQuery();
   await safeEdit(ctx, "", menuKeyboard(),main_menu);
-
 });
 
-////////////////////////////////////////////////////////////
 // VPN MENU
-////////////////////////////////////////////////////////////
-
 bot.callbackQuery("vpn", async (ctx) => {
   if (!(await hasUserAccepted(ctx)))
     return ctx.answerCallbackQuery("Сначала примите оферту");
@@ -258,22 +192,22 @@ bot.callbackQuery("vpn", async (ctx) => {
   await safeEdit(ctx,`
     Тарифы:
 
+
 1️⃣  1 месяц — 100 ₽  /  90 ⭐
+
 
 3️⃣  3 месяца — 270 ₽  /  200 ⭐
 
+
 6️⃣  6 месяцев — 510 ₽  /  450 ⭐
 
+
 1️⃣2️⃣  12 месяцев — 900 ₽  /  700 ⭐`,
-vpnKeyboard(),tarid_photo);
+  vpnKeyboard(),tarid_photo);
 });
 
-////////////////////////////////////////////////////////////
 // BUY VPN
-////////////////////////////////////////////////////////////
-
 bot.callbackQuery(/buy_(\d+)/, async (ctx) => {
-
   if (!(await hasUserAccepted(ctx)))
     return ctx.answerCallbackQuery("Сначала примите оферту");
 
@@ -295,22 +229,19 @@ bot.callbackQuery(/buy_(\d+)/, async (ctx) => {
     ctx,
 `💳 <b>Вы выбрали тариф:</b> ${months} мес.
 
+
 💰 Стоимость:
 ${pricesText[months]}
+
 
 Выберите способ оплаты 👇`,
     payKeyboard(months),
     pay_photo
   );
-
 });
 
-////////////////////////////////////////////////////////////
 // PAY STARS
-////////////////////////////////////////////////////////////
-
 bot.callbackQuery(/pay_stars_(\d+)/, async (ctx) => {
-
   const months = Number(ctx.match[1]);
 
   await ctx.answerCallbackQuery();
@@ -327,15 +258,10 @@ bot.callbackQuery(/pay_stars_(\d+)/, async (ctx) => {
       }
     ]
   );
-
 });
 
-////////////////////////////////////////////////////////////
 // PAY ЮКАССА
-////////////////////////////////////////////////////////////
-
 bot.callbackQuery(/pay_ykassa_(\d+)/, async (ctx) => {
-
   const months = Number(ctx.match[1]);
 
   await ctx.answerCallbackQuery();
@@ -343,19 +269,16 @@ bot.callbackQuery(/pay_ykassa_(\d+)/, async (ctx) => {
   await ctx.reply(
 `💳 Оплата через ЮKassa
 
+
 Тариф: ${months} мес.
+
 
 (сюда вставишь ссылку на оплату)`
   );
-
 });
 
-////////////////////////////////////////////////////////////
 // MY VPN
-////////////////////////////////////////////////////////////
-
 bot.callbackQuery("myvpn", async (ctx) => {
-
   await ctx.answerCallbackQuery();
 
   const email = String(ctx.from.id);
@@ -363,13 +286,11 @@ bot.callbackQuery("myvpn", async (ctx) => {
   const client = await xui.findClient(email);
 
   if (!client) {
-
     return safeEdit(
       ctx,
       "❌ У вас нет VPN",
       new InlineKeyboard().text("🌐 подключится к VPN", "vpn")
     );
-
   }
 
   const link = xui.generateLink(client.uuid);
@@ -379,21 +300,15 @@ bot.callbackQuery("myvpn", async (ctx) => {
   await safeEdit(ctx,`⏳ Осталось дней: ${days}
   <pre>${link}</pre>`,
   myVPNKeyboards(),profil_photo);
-
 });
 
-////////////////////////////////////////////////////////////
 // SHOW KEY
-////////////////////////////////////////////////////////////
-
 bot.on("pre_checkout_query", (ctx) => {
   return ctx.answerPreCheckoutQuery(true);
 });
 
 bot.on("message:successful_payment", async (ctx) => {
-
   try {
-
     const payload = ctx.message.successful_payment.invoice_payload;
 
     const parts = payload.split("_");
@@ -406,12 +321,12 @@ bot.on("message:successful_payment", async (ctx) => {
     const client = await xui.findClient(email);
 
     if (!client) {
-
       const uuid = await xui.addUser(email, months);
       const link = xui.generateLink(uuid);
 
       await ctx.reply(
 `✅ Оплата прошла
+
 
 🔐 Ваш VPN:
 <pre>${link}</pre>`,
@@ -419,7 +334,6 @@ bot.on("message:successful_payment", async (ctx) => {
       );
 
       return;
-
     }
 
     await xui.extendUser(client.uuid, email, months);
@@ -433,21 +347,18 @@ bot.on("message:successful_payment", async (ctx) => {
     await ctx.reply(
 `✅ VPN продлён!
 
+
 ⏳ Осталось дней: ${days}`,
       { parse_mode: "HTML" }
     );
 
   } catch (err) {
-
     console.error("PAYMENT ERROR:", err);
     await ctx.reply("Ошибка после оплаты");
-
   }
-
 });
 
 bot.callbackQuery("my_key", async (ctx) => {
-
   await ctx.answerCallbackQuery();
 
   const email = String(ctx.from.id);
@@ -463,56 +374,51 @@ bot.callbackQuery("my_key", async (ctx) => {
   `🔑 Ваш VPN ключ
   <pre>${link}</pre>
 
+
 Нажмите на него чтобы скопировать.`,
     myVPNKeyboard(),
     { parse_mode: "HTML" }
   );
-
 });
 
-////////////////////////////////////////////////////////////
 // SUPPORT
-////////////////////////////////////////////////////////////
-
 bot.callbackQuery("support", async (ctx) => {
-
   await ctx.answerCallbackQuery();
 
   await safeEdit(
   ctx,
   "Бог в помощь немощь",
   new InlineKeyboard().text("🔙 Назад", "menu"),supp_photo
-);
-
+  );
 });
 
 async function checkExpiringVPN() {
-
   try {
-
     const inbound = await xui.getInbound();
 
     const clients = inbound.clientStats || [];
 
     for (const client of clients) {
-
       if (!client.email) continue;
 
       const days = daysLeft(client.expiryTime);
 
       if (days === 3) {
-
         const link = xui.generateLink(client.uuid);
 
         await bot.api.sendMessage(
           client.email,
 `⚠️ Ваш VPN скоро закончится
 
+
 ⏳ Осталось: ${days} дня
+
 
 🔐 Ваш ключ:
 
+
 \`${link}\`
+
 
 Продлите VPN чтобы не потерять доступ.`,
           {
@@ -521,27 +427,17 @@ async function checkExpiringVPN() {
               .text("🔄 Продлить VPN", "vpn")
           }
         );
-
       }
-
     }
-
   }
 
   catch (err) {
-
     console.error("Check expiry error:", err);
-
   }
-
 }
 
-////////////////////////////////////////////////////////////
 // START BOT
-////////////////////////////////////////////////////////////
-
 async function start() {
-
   const ok = await xui.login();
 
   if (!ok)
@@ -561,7 +457,6 @@ async function start() {
   console.log("🚀 VPN BOT STARTED");
 
   setInterval(checkExpiringVPN, 6 * 60 * 60 * 1000);
-
 }
 
 start();

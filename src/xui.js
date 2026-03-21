@@ -4,7 +4,27 @@ const axios = require("axios");
 const https = require("https");
 const crypto = require("crypto");
 
+const PRICES = {
+ 1: 90, 
+ 3: 200, 
+ 6: 450,   
+ 12: 700   
+};
+
+const acceptedOferta = new Set();
+const userLocks = new Map();
 const clientCache = new Map();
+
+function lockUser(userId, ms = 1500) {
+  const now = Date.now();
+  if (userLocks.has(userId)) {
+    const last = userLocks.get(userId);
+    if (now - last < ms)
+      return true;
+  }
+  userLocks.set(userId, now);
+  return false;
+}
 
 const agent = new https.Agent({
   rejectUnauthorized: false,
@@ -19,10 +39,8 @@ const api = axios.create({
 
 function daysLeft(expiryTime) {
   if (!expiryTime) return 0;
-
   const diff = expiryTime - Date.now();
   if (diff <= 0) return 0;
-
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
@@ -43,6 +61,7 @@ class XUIManager {
     });
 
     this.cookies = res.headers["set-cookie"]?.join("; ") || "";
+
     api.defaults.headers.Cookie = this.cookies;
 
     return !!this.cookies;
@@ -67,10 +86,8 @@ class XUIManager {
   async findClient(email) {
     if (clientCache.has(email))
       return clientCache.get(email);
-
     const inbound = await this.getInbound();
     const client = inbound.clientStats.find(c => c.email === email);
-
     if (client)
       clientCache.set(email, client);
 
@@ -78,33 +95,38 @@ class XUIManager {
   }
 
   async addUser(email, months) {
-    await this.getInbound();
+    const inbound = await this.getInbound();
 
     const id = crypto.randomUUID();
+
     const expiry = Date.now() + months * 2629800000;
 
-    await api.post("panel/api/inbounds/addClient", {
-      id: this.inbound.id,
-      settings: JSON.stringify({
-        clients: [{
-          id,
-          email,
-          enable: true,
-          limitIp: 1,
-          totalGB: 0,
-          expiryTime: expiry,
-          flow: "xtls-rprx-vision",
-          tgId: "",
-          subId: "",
-        }]
-      })
-    });
+    await api.post(
+      "panel/api/inbounds/addClient",
+      {
+        id: this.inbound.id,
+        settings: JSON.stringify({ 
+          clients: [{ 
+            id: id, 
+            email: email, 
+            enable: true, 
+            limitIp: 1, 
+            totalGB: 0, 
+            expiryTime: expiry, 
+            flow: "xtls-rprx-vision", 
+            tgId: "", 
+            subId: "",
+          }] 
+        })
+      }
+    );
 
     return id;
   }
 
   async extendUser(uuid, email, months) {
     const inbound = await this.getInbound();
+
     const client = inbound.clientStats.find(c => c.email === email);
 
     let expiry = client?.expiryTime || Date.now();
@@ -136,7 +158,11 @@ class XUIManager {
 const xui = new XUIManager();
 
 module.exports = {
-  xui,
+  PRICES,
+  acceptedOferta,
+  userLocks,
+  clientCache,
+  lockUser,
   daysLeft,
-  clientCache
+  xui
 };
