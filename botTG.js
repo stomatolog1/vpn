@@ -16,10 +16,10 @@ const tarid_photo = 'AgACAgIAAxkBAAIGH2m5j94SreQlsfkmoJyDYo_lNTLtAAKaG2sbacLISQW
 
 
 const PRICES = {
-  1: 10000,   // 100 ⭐
-  3: 27000,   // 270 ⭐
-  6: 51000,   // 510 ⭐
-  12: 90000   // 900 ⭐ (добавил)
+  1: 90,   // 100 ⭐
+  3: 200,   // 270 ⭐
+  6: 450,   // 510 ⭐
+  12: 700   // 900 ⭐ (добавил)
 };
 
 const acceptedOferta = new Set();
@@ -383,6 +383,13 @@ function myVPNKeyboards(){
     .text("🔄 Продлить VPN", "vpn").row()
     .text("↩️ Назад", "menu");
 }
+
+function payKeyboard(months) {
+  return new InlineKeyboard()
+    .text("⭐ Оплатить STARS", `pay_stars_${months}`).row()
+    .text("💳 Оплатить ЮKassa", `pay_ykassa_${months}`).row()
+    .text("↩️ Назад", "vpn");
+}
 ////////////////////////////////////////////////////////////
 // START
 ////////////////////////////////////////////////////////////
@@ -445,12 +452,15 @@ bot.callbackQuery("vpn", async (ctx) => {
     return ctx.answerCallbackQuery("Сначала примите оферту");
   await ctx.answerCallbackQuery();
   await safeEdit(ctx,`
-1️⃣ 1 месяц — 100 ₽
+    Тарифы:
+1️⃣ 1 месяц — 100 ₽ / 90 ⭐
 
-3️⃣ 3 месяца — 270 ₽
+3️⃣ 3 месяца — 270 ₽ / 200 ⭐
 
-6️⃣ 6 месяцев — 510 ₽`,
-vpnKeyboard(),pay_photo);
+6️⃣ 6 месяцев — 510 ₽ / 450 ⭐
+
+1️⃣2️⃣ 12 месяцев — 900 ₽ / 700 ⭐`,
+vpnKeyboard(),tarid_photo);
 });
 
 ////////////////////////////////////////////////////////////
@@ -469,18 +479,69 @@ bot.callbackQuery(/buy_(\d+)/, async (ctx) => {
 
   await ctx.answerCallbackQuery();
 
+  const pricesText = {
+    1: "100 ₽ / 90 ⭐",
+    3: "270 ₽ / 200 ⭐",
+    6: "510 ₽ / 450 ⭐",
+    12: "900 ₽ / 700 ⭐"
+  };
+
+  await safeEdit(
+    ctx,
+`💳 <b>Вы выбрали тариф:</b> ${months} мес.
+
+💰 Стоимость:
+${pricesText[months]}
+
+Выберите способ оплаты 👇`,
+    payKeyboard(months),
+    pay_photo
+  );
+
+});
+
+////////////////////////////////////////////////////////////
+// PAY STARS
+////////////////////////////////////////////////////////////
+
+bot.callbackQuery(/pay_stars_(\d+)/, async (ctx) => {
+
+  const months = Number(ctx.match[1]);
+
+  await ctx.answerCallbackQuery();
+
   await ctx.replyWithInvoice(
-  "VPN подписка",                      // title
-  `VPN на ${months} мес.`,             // description
-  `vpn_${months}_${ctx.from.id}`,      // payload
-  "XTR",                               // Stars
-  [
-    {
-      label: `${months} мес.`,
-      amount: PRICES[months]
-    }
-  ]
-);
+    "VPN подписка",
+    `VPN на ${months} мес.`,
+    `vpn_${months}_${ctx.from.id}`,
+    "XTR",
+    [
+      {
+        label: `${months} мес.`,
+        amount: PRICES[months]
+      }
+    ]
+  );
+
+});
+
+////////////////////////////////////////////////////////////
+// PAY ЮКАССА
+////////////////////////////////////////////////////////////
+
+bot.callbackQuery(/pay_ykassa_(\d+)/, async (ctx) => {
+
+  const months = Number(ctx.match[1]);
+
+  await ctx.answerCallbackQuery();
+
+  await ctx.reply(
+`💳 Оплата через ЮKassa
+
+Тариф: ${months} мес.
+
+(сюда вставишь ссылку на оплату)`
+  );
 
 });
 
@@ -501,7 +562,7 @@ bot.callbackQuery("myvpn", async (ctx) => {
     return safeEdit(
       ctx,
       "❌ У вас нет VPN",
-      new InlineKeyboard().text("🔐 Купить VPN", "vpn")
+      new InlineKeyboard().text("🌐 подключится к VPN", "vpn")
     );
 
   }
