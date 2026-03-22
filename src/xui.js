@@ -4,27 +4,44 @@ const axios = require("axios");
 const https = require("https");
 const crypto = require("crypto");
 
+////////////////////////////////////////////////////////////
+// CONFIG
+////////////////////////////////////////////////////////////
+
 const PRICES = {
- 1: 90, 
- 3: 200, 
- 6: 450,   
- 12: 700   
+  1: 90,
+  3: 200,
+  6: 450,
+  12: 700
 };
 
-const acceptedOferta = new Set();
+////////////////////////////////////////////////////////////
+// MEMORY
+////////////////////////////////////////////////////////////
+
 const userLocks = new Map();
 const clientCache = new Map();
 
+////////////////////////////////////////////////////////////
+// LOCK (антиспам)
+////////////////////////////////////////////////////////////
+
 function lockUser(userId, ms = 1500) {
   const now = Date.now();
+
   if (userLocks.has(userId)) {
     const last = userLocks.get(userId);
-    if (now - last < ms)
-      return true;
+
+    if (now - last < ms) return true;
   }
+
   userLocks.set(userId, now);
   return false;
 }
+
+////////////////////////////////////////////////////////////
+// AXIOS
+////////////////////////////////////////////////////////////
 
 const agent = new https.Agent({
   rejectUnauthorized: false,
@@ -34,15 +51,27 @@ const agent = new https.Agent({
 const api = axios.create({
   baseURL: process.env.XUI_URL,
   httpsAgent: agent,
-  headers: { "Content-Type": "application/json" }
+  headers: { "Content-Type": "application/json" },
+  timeout: 10000
 });
+
+////////////////////////////////////////////////////////////
+// UTILS
+////////////////////////////////////////////////////////////
 
 function daysLeft(expiryTime) {
   if (!expiryTime) return 0;
+
   const diff = expiryTime - Date.now();
+
   if (diff <= 0) return 0;
+
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
+
+////////////////////////////////////////////////////////////
+// XUI CLASS
+////////////////////////////////////////////////////////////
 
 class XUIManager {
   constructor() {
@@ -54,112 +83,187 @@ class XUIManager {
     this.sni = process.env.SERVER_SNI;
   }
 
+  ////////////////////////////////////////////////////////////
+  // LOGIN
+  ////////////////////////////////////////////////////////////
+
   async login() {
-    const res = await api.post("login", {
-      username: process.env.XUI_USER,
-      password: process.env.XUI_PASS
-    });
+    try {
+      const res = await api.post("login", {
+        username: process.env.XUI_USER,
+        password: process.env.XUI_PASS
+      });
 
-    this.cookies = res.headers["set-cookie"]?.join("; ") || "";
+      this.cookies = res.headers["set-cookie"]?.join("; ") || "";
 
-    api.defaults.headers.Cookie = this.cookies;
+      api.defaults.headers.Cookie = this.cookies;
 
-    return !!this.cookies;
+      return !!this.cookies;
+
+    } catch (err) {
+      console.error("XUI LOGIN ERROR:", err.message);
+      return false;
+    }
   }
+
+  ////////////////////////////////////////////////////////////
+  // GET INBOUND
+  ////////////////////////////////////////////////////////////
 
   async getInbound() {
-    if (this.inbound && Date.now() - this.lastUpdate < 10000)
-      return this.inbound;
+    try {
+      if (this.inbound && Date.now() - this.lastUpdate < 10000) {
+        return this.inbound;
+      }
 
-    const res = await api.get("panel/api/inbounds/list");
+      const res = await api.get("panel/api/inbounds/list");
 
-    this.inbound = res.data.obj?.[0];
+      const inbound = res.data?.obj?.[0];
 
-    if (!this.inbound)
-      throw new Error("Inbound not found");
+      if (!inbound) {
+        throw new Error("Inbound not found");
+      }
 
-    this.lastUpdate = Date.now();
+      this.inbound = inbound;
+      this.lastUpdate = Date.now();
 
-    return this.inbound;
+      return inbound;
+
+    } catch (err) {
+      console.error("GET INBOUND ERROR:", err.message);
+      throw err;
+    }
   }
+
+  ////////////////////////////////////////////////////////////
+  // FIND CLIENT
+  ////////////////////////////////////////////////////////////
 
   async findClient(email) {
-    if (clientCache.has(email))
-      return clientCache.get(email);
-    const inbound = await this.getInbound();
-    const client = inbound.clientStats.find(c => c.email === email);
-    if (client)
-      clientCache.set(email, client);
+    try {
+      const cached = clientCache.get(email);
 
-    return client || null;
+      if (cached && Date.now() - cached.time < 10000) {
+        return cached.data;
+      }
+
+      const inbound = await this.getInbound();
+
+      const clients = inbound.clientStats || [];
+
+      const client = clients.find(c => c.email === email);
+
+      if (client) {
+        clientCache.set(email, {
+          data: client,
+          time: Date.now()
+        });
+      }
+
+      return client || null;
+
+    } catch (err) {
+      console.error("FIND CLIENT ERROR:", err.message);
+      throw err;
+    }
   }
+
+  ////////////////////////////////////////////////////////////
+  // ADD USER
+  ////////////////////////////////////////////////////////////
 
   async addUser(email, months) {
-    const inbound = await this.getInbound();
+    try {
+      const inbound = await this.getInbound();
 
-    const id = crypto.randomUUID();
+      const id = crypto.randomUUID();
 
-    const expiry = Date.now() + months * 2629800000;
+      const expiry = Date.now() + months * 2629800000;
 
-    await api.post(
-      "panel/api/inbounds/addClient",
-      {
-        id: this.inbound.id,
-        settings: JSON.stringify({ 
-          clients: [{ 
-            id: id, 
-            email: email, 
-            enable: true, 
-            limitIp: 1, 
-            totalGB: 0, 
-            expiryTime: expiry, 
-            flow: "xtls-rprx-vision", 
-            tgId: "", 
-            subId: "",
-          }] 
-        })
-      }
-    );
+      await api.post(
+        "panel/api/inbounds/addClient",
+        {
+          id: inbound.id,
+          settings: JSON.stringify({
+            clients: [{
+              id,
+              email,
+              enable: true,
+              limitIp: 1,
+              totalGB: 0,
+              expiryTime: expiry,
+              flow: "xtls-rprx-vision",
+              tgId: "",
+              subId: ""
+            }]
+          })
+        }
+      );
 
-    return id;
+      return id;
+
+    } catch (err) {
+      console.error("ADD USER ERROR:", err.message);
+      throw err;
+    }
   }
+
+  ////////////////////////////////////////////////////////////
+  // EXTEND USER
+  ////////////////////////////////////////////////////////////
 
   async extendUser(uuid, email, months) {
-    const inbound = await this.getInbound();
+    try {
+      const inbound = await this.getInbound();
 
-    const client = inbound.clientStats.find(c => c.email === email);
+      const clients = inbound.clientStats || [];
 
-    let expiry = client?.expiryTime || Date.now();
+      const client = clients.find(c => c.email === email);
 
-    if (expiry < Date.now())
-      expiry = Date.now();
+      let expiry = client?.expiryTime || Date.now();
 
-    expiry += months * 2629800000;
+      if (expiry < Date.now()) {
+        expiry = Date.now();
+      }
 
-    await api.post(`panel/api/inbounds/updateClient/${uuid}`, {
-      id: inbound.id,
-      settings: JSON.stringify({
-        clients: [{
-          id: uuid,
-          email,
-          flow: "xtls-rprx-vision",
-          limitIp: 1,
-          expiryTime: expiry
-        }]
-      })
-    });
+      expiry += months * 2629800000;
+
+      await api.post(`panel/api/inbounds/updateClient/${uuid}`, {
+        id: inbound.id,
+        settings: JSON.stringify({
+          clients: [{
+            id: uuid,
+            email,
+            flow: "xtls-rprx-vision",
+            limitIp: 1,
+            expiryTime: expiry
+          }]
+        })
+      });
+
+    } catch (err) {
+      console.error("EXTEND USER ERROR:", err.message);
+      throw err;
+    }
   }
+
+  ////////////////////////////////////////////////////////////
+  // GENERATE LINK
+  ////////////////////////////////////////////////////////////
 
   generateLink(id) {
-    return `vless://${id}@${this.server}:443?type=tcp&encryption=none&security=reality&pbk=nNsVyT-sVn3qrfTk9ecJ5KTcoB24NUr7c2MLaeHnKnc&fp=chrome&sni=web.max.ru&sid=b60b&spx=%2F&flow=xtls-rprx-vision#🇫🇮Финляндия`;
+    return `vless://${id}@${this.server}:443?type=tcp&encryption=none&security=reality&pbk=nNsVyT-sVn3qrfTk9ecJ5KTcoB24NUr7c2MLaeHnKnc&fp=chrome&sni=${this.sni}&sid=b60b&spx=%2F&flow=xtls-rprx-vision#VPN`;
   }
 }
+
+////////////////////////////////////////////////////////////
+// EXPORT
+////////////////////////////////////////////////////////////
 
 const xui = new XUIManager();
 
 module.exports = {
   PRICES,
-  acceptedOferta,
   userLocks,
   clientCache,
   lockUser,
