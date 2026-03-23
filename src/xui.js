@@ -252,7 +252,7 @@ class XUIManager {
   ////////////////////////////////////////////////////////////
 
   generateLink(id) {
-    return `vless://${id}@${this.server}:443?type=tcp&encryption=none&security=reality&pbk=nNsVyT-sVn3qrfTk9ecJ5KTcoB24NUr7c2MLaeHnKnc&fp=chrome&sni=${this.sni}&sid=b60b&spx=%2F&flow=xtls-rprx-vision#VPN`;
+    return `vless://${id}@${this.server}?type=tcp&encryption=none&security=reality&pbk=nNsVyT-sVn3qrfTk9ecJ5KTcoB24NUr7c2MLaeHnKnc&fp=chrome&sni=${this.sni}&sid=b60b&spx=%2F&flow=xtls-rprx-vision#VPN`;
   }
 }
 

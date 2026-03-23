@@ -298,7 +298,7 @@ bot.callbackQuery(/pay_ykassa_(\d+)/, async (ctx) => {
 bot.callbackQuery("myvpn", async (ctx) => {
   await ctx.answerCallbackQuery();
 
-  const email = `tg_${ctx.from.id}`;
+  const email = ctx.from.id;
 
   let client = null;
 
@@ -338,26 +338,24 @@ bot.on("pre_checkout_query", (ctx) => {
 bot.on("message:successful_payment", async (ctx) => {
   try {
     const db = require("../data/db");
-
+    
     const payload = ctx.message.successful_payment.invoice_payload;
 
     const [type, userIdRaw, monthsRaw] = payload.split(":");
 
-    db.logPayment(userId, months);
     
     if (type !== "vpn") return;
-
     const userId = Number(userIdRaw);
     const months = Number(monthsRaw);
-
     if (!PRICES[months]) {
-      return ctx.reply("Ошибка тарифа");
+    return ctx.reply("Ошибка тарифа");
     }
+    db.logPayment(userId, months);
 
     // снимаем блок оплаты
     activePayments.delete(userId);
 
-    const email = `tg_${userId}`;
+    const email = userId;
 
     let client = null;
 
@@ -421,7 +419,7 @@ bot.on("message:successful_payment", async (ctx) => {
 bot.callbackQuery("my_key", async (ctx) => {
   await ctx.answerCallbackQuery();
 
-  const email = `tg_${ctx.from.id}`;
+  const email = ctx.from.id;
 
   let client = null;
 
