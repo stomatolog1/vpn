@@ -18,27 +18,6 @@ const supp_photo = 'AgACAgIAAxkBAAIFS2m0bnCeAAFa3DG2gcILgqhju5qNqAACtBtrG3Q0oUm1
 const tarid_photo = 'AgACAgIAAxkBAAIGH2m5j94SreQlsfkmoJyDYo_lNTLtAAKaG2sbacLISQWyLdDPl3iLAQADAgADeQADOgQ'
 
 
-const activePayments = new Set();
-
-
-async function hasUserAccepted(ctx) {
-  const id = ctx.from.id;
-
-
-  const email = String(id);
-
-  try {
-    const client = await xui.findClient(email);
-
-    if (client) {
-      return true;
-    }
-
-  } catch {}
-
-  return false;
-}
-
 // BOT
 const bot = new Bot(process.env.BOT_TOKEN);
 
@@ -106,12 +85,12 @@ async function safeEdit(ctx, text, keyboard = null, media = null) {
 }
 
 // KEYBOARDS
-function ofertaKeyboard() {
-  return new InlineKeyboard()
-    .url("📄 Оферта", "https://example.com/oferta")
-    .row()
-    .text("✅ Принять оферту", "accept_oferta");
-}
+// function ofertaKeyboard() {
+//   return new InlineKeyboard()
+//     .url("📄 Оферта", "https://example.com/oferta")
+//     .row()
+//     .text("✅ Принять оферту", "accept_oferta");
+// }
 
 function menuKeyboard() {
   return new InlineKeyboard()
@@ -152,12 +131,7 @@ function payKeyboard(months) {
 // START
 bot.command("start", async (ctx) => {
   if (!db.hasAccepted(ctx.from.id)) {
-    return ctx.replyWithPhoto(main_photo,
-      {
-        caption: "Перед использованием VPN необходимо принять оферту",
-        reply_markup: ofertaKeyboard()
-      }
-    );
+      db.acceptOferta(ctx.from.id);
   }
 
   await ctx.replyWithPhoto(
@@ -169,13 +143,13 @@ bot.command("start", async (ctx) => {
 });
 
 // ACCEPT OFERTA
-bot.callbackQuery("accept_oferta", async (ctx) => {
-  db.acceptOferta(ctx.from.id);
+// bot.callbackQuery("accept_oferta", async (ctx) => {
+//   db.acceptOferta(ctx.from.id);
 
-  await ctx.answerCallbackQuery();
+//   await ctx.answerCallbackQuery();
 
-  await safeEdit(ctx,'',menuKeyboard(),main_menu);
-});
+//   await safeEdit(ctx,'',menuKeyboard(),main_menu);
+// });
 
 // MENU
 bot.callbackQuery("menu", async (ctx) => {
@@ -185,8 +159,8 @@ bot.callbackQuery("menu", async (ctx) => {
 
 // VPN MENU
 bot.callbackQuery("vpn", async (ctx) => {
-  if (!db.hasAccepted(ctx.from.id))
-    return ctx.answerCallbackQuery("Сначала примите оферту");
+  // if (!db.hasAccepted(ctx.from.id))
+  //   return ctx.answerCallbackQuery("Сначала примите оферту");
   await ctx.answerCallbackQuery();
   await safeEdit(ctx,`
     Тарифы:
@@ -207,8 +181,8 @@ bot.callbackQuery("vpn", async (ctx) => {
 
 // BUY VPN
 bot.callbackQuery(/buy_(\d+)/, async (ctx) => {
-  if (!db.hasAccepted(ctx.from.id))
-    return ctx.answerCallbackQuery("Сначала примите оферту");
+  // if (!db.hasAccepted(ctx.from.id))
+  //   return ctx.answerCallbackQuery("Сначала примите оферту");
 
   const months = Number(ctx.match[1]);
 
@@ -247,21 +221,11 @@ bot.callbackQuery(/pay_stars_(\d+)/, async (ctx) => {
     return ctx.answerCallbackQuery("Ошибка тарифа");
   }
 
-  if (!db.hasAccepted(ctx.from.id)) {
-    return ctx.answerCallbackQuery("Сначала примите оферту");
-  }
-
-  if (activePayments.has(ctx.from.id)) {
-    return ctx.answerCallbackQuery("⏳ Уже есть активная оплата");
-  }
+  // if (!db.hasAccepted(ctx.from.id)) {
+  //   return ctx.answerCallbackQuery("Сначала примите оферту");
+  // }
 
   await ctx.answerCallbackQuery();
-
-  activePayments.add(ctx.from.id);
-
-  setTimeout(() => {
-    activePayments.delete(ctx.from.id);
-  }, 5 * 60 * 1000);
 
   await ctx.replyWithInvoice(
     "VPN подписка",
@@ -298,22 +262,18 @@ bot.callbackQuery(/pay_ykassa_(\d+)/, async (ctx) => {
 bot.callbackQuery("myvpn", async (ctx) => {
   await ctx.answerCallbackQuery();
 
-  const email = ctx.from.id;
+  const email = String(ctx.from.id);
 
   let client = null;
 
-  try {
-    client = await xui.findClient(email);
-  } catch (err) {
-    console.error("FIND CLIENT ERROR:", err);
-    return ctx.reply("Ошибка сервера");
-  }
+  client = await xui.findClient(email);
 
   if (!client) {
     return safeEdit(
       ctx,
       "❌ У вас нет VPN",
-      new InlineKeyboard().text("🌐 подключится к VPN", "vpn")
+      new InlineKeyboard().text("🌐 подключится к VPN", "vpn"),
+      profil_photo
     );
   }
 
@@ -345,7 +305,7 @@ bot.on("message:successful_payment", async (ctx) => {
 
     
     if (type !== "vpn") return;
-    const userId = Number(userIdRaw);
+    const userId = String(userIdRaw);
     const months = Number(monthsRaw);
     if (!PRICES[months]) {
     return ctx.reply("Ошибка тарифа");
@@ -353,9 +313,8 @@ bot.on("message:successful_payment", async (ctx) => {
     db.logPayment(userId, months);
 
     // снимаем блок оплаты
-    activePayments.delete(userId);
 
-    const email = userId;
+    const email = String(userId);
 
     let client = null;
 
@@ -402,11 +361,13 @@ bot.on("message:successful_payment", async (ctx) => {
     const updatedClient = await xui.findClient(email);
 
     const days = daysLeft(updatedClient.expiryTime);
+    const link = xui.generateLink(updatedClient.uuid); // ✅ фикс
 
     await ctx.reply(
-`✅ VPN продлён!
+    `✅ VPN продлён!
 
-⏳ Осталось дней: ${days}`,
+🔐 Ваш VPN:
+    <pre>${link}</pre>`,
       { parse_mode: "HTML" }
     );
 
@@ -419,7 +380,7 @@ bot.on("message:successful_payment", async (ctx) => {
 bot.callbackQuery("my_key", async (ctx) => {
   await ctx.answerCallbackQuery();
 
-  const email = ctx.from.id;
+  const email = String(ctx.from.id);
 
   let client = null;
 

@@ -9,7 +9,7 @@ const crypto = require("crypto");
 ////////////////////////////////////////////////////////////
 
 const PRICES = {
-  1: 90,
+  1: 1,
   3: 200,
   6: 450,
   12: 700
@@ -26,7 +26,7 @@ const clientCache = new Map();
 // LOCK (антиспам)
 ////////////////////////////////////////////////////////////
 
-function lockUser(userId, ms = 1500) {
+function lockUser(userId, ms = 500) {
   const now = Date.now();
 
   if (userLocks.has(userId)) {
@@ -231,15 +231,17 @@ class XUIManager {
       await api.post(`panel/api/inbounds/updateClient/${uuid}`, {
         id: inbound.id,
         settings: JSON.stringify({
-          clients: [{
-            id: uuid,
-            email,
-            flow: "xtls-rprx-vision",
-            limitIp: 1,
-            expiryTime: expiry
-          }]
-        })
-      });
+        clients: [{
+          id: uuid,
+          email,
+          enable: true,              
+          flow: "xtls-rprx-vision",
+          limitIp: 1,
+          totalGB: 0,                
+          expiryTime: expiry
+        }]
+      })
+    });
 
     } catch (err) {
       console.error("EXTEND USER ERROR:", err.message);
@@ -252,8 +254,7 @@ class XUIManager {
   ////////////////////////////////////////////////////////////
 
   generateLink(id) {
-    return `vless://${id}@${this.server}?type=tcp&encryption=none&security=reality&pbk=nNsVyT-sVn3qrfTk9ecJ5KTcoB24NUr7c2MLaeHnKnc&fp=chrome&sni=${this.sni}&sid=b60b&spx=%2F&flow=xtls-rprx-vision#VPN`;
-  }
+return `vless://${id}@${this.server}?type=tcp&encryption=none&security=reality&pbk=eLh2SyMNtfcydKFDiU-YvJB9PtR8RvRtST0WZRK2g0s&fp=chrome&sni=${this.sni}&sid=151c43db95b1&spx=%2F&flow=xtls-rprx-vision#🇫🇮 Финляндия`;  }
 }
 
 ////////////////////////////////////////////////////////////
