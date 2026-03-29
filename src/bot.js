@@ -1,8 +1,10 @@
 require("dotenv").config();
 const db = require("../data/db.js");
+const YooKassa = require('yookassa');
 const { Bot, InlineKeyboard } = require("grammy");
 const {
   PRICES,
+  PRICE_RUB,
   clientCache,
   lockUser,
   daysLeft,
@@ -175,7 +177,11 @@ bot.callbackQuery("vpn", async (ctx) => {
 6️⃣  6 месяцев — 510 ₽  /  450 ⭐
 
 
-1️⃣2️⃣  12 месяцев — 900 ₽  /  700 ⭐`,
+1️⃣2️⃣  12 месяцев — 900 ₽  /  700 ⭐
+
+❗️ Ваш ключ VLESS может использоваться не более чем 3 устройствах, иначе скорость соединения будет специально ограничена.`,
+
+
   vpnKeyboard(),tarid_photo);
 });
 
@@ -220,11 +226,6 @@ bot.callbackQuery(/pay_stars_(\d+)/, async (ctx) => {
   if (!PRICES[months]) {
     return ctx.answerCallbackQuery("Ошибка тарифа");
   }
-
-  // if (!db.hasAccepted(ctx.from.id)) {
-  //   return ctx.answerCallbackQuery("Сначала примите оферту");
-  // }
-
   await ctx.answerCallbackQuery();
 
   await ctx.replyWithInvoice(
@@ -241,23 +242,162 @@ bot.callbackQuery(/pay_stars_(\d+)/, async (ctx) => {
   );
 });
 
+
+
+
+
+
+
+
+
+
+
+
+
+/////////////////////////////////////////////
 // PAY ЮКАССА
+
+
+
+
+
+
+const providerInvoiceData = {
+  receipt: {
+    items: [
+      {
+        description: product.description,
+        quantity: 1,
+        amount:{
+          value: `${product.price}.00`,
+          currency: 'RUB'
+        },
+        vat_code: 1,
+      }
+    ]
+  }
+}
+
+
+
 bot.callbackQuery(/pay_ykassa_(\d+)/, async (ctx) => {
+   await ctx.answerCallbackQuery();
   const months = Number(ctx.match[1]);
-
-  await ctx.answerCallbackQuery();
-
-  await ctx.reply(
-`💳 Оплата через ЮKassa
+  if (!PRICES[months]) {
+    return ctx.answerCallbackQuery("Ошибка тарифа");
+  }
 
 
-Тариф: ${months} мес.
-
-
-(сюда вставишь ссылку на оплату)`
-  );
+  try {
+    const chatID = ctx.chat?.id;
+    if(!chatID){
+      throw new Error("chatid не найден в оплате по кассе")
+    }
+    ctx.api.sendInvoice(chatID, product.name, product.description, product.id.toString(), 'RUB',
+      [{
+        label: 'РУБ',
+        amount: product.price * 100
+      }], {
+        provider_token: process.env.PAYMENT_TOKEN,
+        need_email: true,
+        send_email_to_provider: true,
+        provider_data: JSON.stringify(providerInvoiceData)
+      })
+  } catch (error) {
+    console.Error("Error in payment")
+    ctx.reply('произошла ошибка')
+  }
 });
 
+bot.callbackQuery(/pay_ykassa_(\d+)/, async (ctx) => {
+  await ctx.answerCallbackQuery();
+
+  const months = Number(ctx.match[1]);
+
+  if (!PRICES[months]) {
+    return ctx.answerCallbackQuery("Ошибка тарифа");
+  }
+
+  try {
+    const chatID = ctx.chat?.id;
+
+    if (!chatID) {
+      throw new Error("chatid не найден в оплате по кассе");
+    }
+
+    // создаю продукт
+    const product = {
+      id: `vpn_${months}`,
+      name: "VPN подписка",
+      description: `VPN на ${months} мес.`,
+      price: PRICE_RUB[months] * 100 // перевод из копеек в рубли
+    };
+
+    // данные для ЮKassa (чек)
+    const providerInvoiceData = {
+      receipt: {
+        items: [
+          {
+            description: product.description,
+            quantity: 1,
+            amount: {
+              value: product.price.toFixed(2),
+              currency: "RUB"
+            },
+            vat_code: 1
+          }
+        ]
+      }
+    };
+
+    await ctx.api.sendInvoice(
+      chatID,
+      product.name,
+      product.description,
+      `vpn:${ctx.from.id}:${months}:${Date.now()}`, // ВАЖНО
+      process.env.PAYMENT_TOKEN,
+      "RUB",
+      [
+        {
+          label: product.description,
+          amount: PRICES[months]
+        }
+      ],
+      {
+        need_email: true,
+        send_email_to_provider: true,
+        provider_data: JSON.stringify(providerInvoiceData)
+      }
+    );
+
+  } catch (error) {
+    console.error("Error in payment", error);
+    await ctx.reply("Произошла ошибка при создании оплаты");
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//////////////////////////////////
 // MY VPN
 bot.callbackQuery("myvpn", async (ctx) => {
   await ctx.answerCallbackQuery();
@@ -312,7 +452,6 @@ bot.on("message:successful_payment", async (ctx) => {
     }
     db.logPayment(userId, months);
 
-    // снимаем блок оплаты
 
     const email = String(userId);
 
@@ -360,8 +499,7 @@ bot.on("message:successful_payment", async (ctx) => {
 
     const updatedClient = await xui.findClient(email);
 
-    const days = daysLeft(updatedClient.expiryTime);
-    const link = xui.generateLink(updatedClient.uuid); // ✅ фикс
+    const link = xui.generateLink(updatedClient.uuid); 
 
     await ctx.reply(
     `✅ VPN продлён!
@@ -412,7 +550,7 @@ bot.callbackQuery("support", async (ctx) => {
 
   await safeEdit(
   ctx,
-  "Бог в помощь немощь",
+  `Если нужна помощь, присоединяйся к нашей <a href="https://t.me/dark_vpn_SUPP">группе</a>!`,
   new InlineKeyboard().text("↩️ Назад", "menu"),supp_photo
   );
 });

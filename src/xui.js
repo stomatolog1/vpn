@@ -9,11 +9,17 @@ const crypto = require("crypto");
 ////////////////////////////////////////////////////////////
 
 const PRICES = {
-  1: 1,
+  1: 90,
   3: 200,
   6: 450,
   12: 700
 };
+const PRICE_RUB ={
+  1: 100,
+  3: 270,
+  6: 510,
+  12: 900
+}
 
 ////////////////////////////////////////////////////////////
 // MEMORY
@@ -189,7 +195,7 @@ class XUIManager {
               id,
               email,
               enable: true,
-              limitIp: 1,
+              limitIp: 3,
               totalGB: 0,
               expiryTime: expiry,
               flow: "xtls-rprx-vision",
@@ -236,7 +242,7 @@ class XUIManager {
           email,
           enable: true,              
           flow: "xtls-rprx-vision",
-          limitIp: 1,
+          limitIp: 3,
           totalGB: 0,                
           expiryTime: expiry
         }]
@@ -265,6 +271,7 @@ const xui = new XUIManager();
 
 module.exports = {
   PRICES,
+  PRICE_RUB,
   userLocks,
   clientCache,
   lockUser,
